@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Décompte</title>
+  <meta name="color-scheme" content="dark light">
+  <style>
+    :root{--bg:#0b0f14;--fg:#e6edf3;--muted:#aab8c5;--accent:#93c5fd;--panel:#101826;--border:#1f2a3a;--ok:#86efac}
+    @media (prefers-color-scheme: light){
+      :root{--bg:#f7fafc;--fg:#0b1220;--muted:#4a5568;--accent:#1d4ed8;--panel:#fff;--border:#e2e8f0}
+    }
+    html,body{height:100%;margin:0;font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+    .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:18px;text-align:center;padding:18px}
+    h1{margin:0;font-weight:650;color:var(--accent);font-size:clamp(18px,2.4vw,22px)}
+    .sub{color:var(--muted);font-size:14px}
+    .time{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+    .b{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 18px;min-width:90px}
+    .n{font-variant-numeric:tabular-nums;font-weight:800;font-size:clamp(28px,9vw,96px);line-height:1}
+    .l{margin-top:6px;font-size:clamp(12px,2.3vw,14px);color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+    .done{font-size:clamp(22px,6vw,48px);color:var(--ok);font-weight:800;display:none}
+    .share{margin-top:8px;font-size:12px;color:var(--muted)}
+    .row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+    .link{padding:8px 12px;border:1px solid var(--border);background:var(--panel);border-radius:10px;color:inherit;text-decoration:none}
+    .inp{width:min(560px,90vw);padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:inherit}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 id="title">Décompte</h1>
+    <div class="sub" id="meta"></div>
+    <div id="count" class="time" aria-live="polite" aria-atomic="true">
+      <div class="b"><div id="d" class="n">--</div><div class="l">jours</div></div>
+      <div class="b"><div id="h" class="n">--</div><div class="l">heures</div></div>
+      <div class="b"><div id="m" class="n">--</div><div class="l">minutes</div></div>
+      <div class="b"><div id="s" class="n">--</div><div class="l">secondes</div></div>
+    </div>
+    <div id="done" class="done">C'est l'heure.</div>
+
+    <div class="share">
+      Lien partageable instantané : <input id="shareurl" class="inp" readonly>
+      <div class="row">
+        <a id="copybtn" class="link" href="#">Copier le lien</a>
+        <a id="openbtn" class="link" href="#" target="_blank" rel="noopener">Ouvrir ce lien</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Helper to read URL params
+  const params = new URLSearchParams(location.search);
+  const targetParam = params.get('t') || '2025-10-19T12:30:00Z'; // UTC default
+  const titleParam = params.get('title') || "Mariage religieux Sonia & Agim";
+  const tzLabel = params.get('tz') || "Europe/Zurich";
+
+  // Compute target timestamp in UTC
+  const targetDate = new Date(targetParam);
+  const targetUTCms = targetDate.getTime();
+
+  // Bind UI
+  const dEl = document.getElementById('d');
+  const hEl = document.getElementById('h');
+  const mEl = document.getElementById('m');
+  const sEl = document.getElementById('s');
+  const doneEl = document.getElementById('done');
+  const countEl = document.getElementById('count');
+  const metaEl = document.getElementById('meta');
+  const titleEl = document.getElementById('title');
+  const shareInp = document.getElementById('shareurl');
+  const copyBtn = document.getElementById('copybtn');
+  const openBtn = document.getElementById('openbtn');
+
+  // Title and meta
+  titleEl.textContent = titleParam || 'Décompte';
+  document.title = 'Décompte — ' + titleEl.textContent;
+  try {
+    const dtFmt = new Intl.DateTimeFormat(undefined, { dateStyle:'full', timeStyle:'short', timeZone: tzLabel });
+    metaEl.textContent = 'Jusqu\\'au ' + dtFmt.format(targetDate) + ' (' + tzLabel + ')';
+  } catch(e){
+    metaEl.textContent = 'Jusqu\\'au ' + targetDate.toString();
+  }
+
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function tick(){
+    const now = Date.now();
+    let diff = Math.max(0, targetUTCms - now);
+    if (diff === 0){
+      countEl.style.display = 'none';
+      doneEl.style.display = 'block';
+      return;
+    }
+    const sec = Math.floor(diff / 1000);
+    const days = Math.floor(sec / 86400);
+    const hours = Math.floor((sec % 86400) / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+    dEl.textContent = days;
+    hEl.textContent = pad(hours);
+    mEl.textContent = pad(mins);
+    sEl.textContent = pad(secs);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // Build a shareable link that encodes the params
+  function buildShareURL(){
+    const base = location.origin && location.href.includes('http') ? location.origin + location.pathname : location.pathname || 'countdown-share.html';
+    const u = new URL(base, location.href);
+    u.searchParams.set('t', targetParam);
+    u.searchParams.set('title', titleParam);
+    u.searchParams.set('tz', tzLabel);
+    return u.toString();
+  }
+  const shareLink = buildShareURL();
+  shareInp.value = shareLink;
+  openBtn.href = shareLink;
+  copyBtn.addEventListener('click', function(ev){
+    ev.preventDefault();
+    shareInp.select();
+    try { document.execCommand('copy'); } catch(e) {}
+  });
+  </script>
+</body>
+</html>
